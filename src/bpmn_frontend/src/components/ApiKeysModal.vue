@@ -34,6 +34,18 @@
           persistent-hint
         />
 
+        <v-text-field
+        v-model="keys.azure"
+        label="Azure OpenAI / Foundry API Key (optional)"
+        placeholder="Azure API Key"
+        type="password"
+        variant="outlined"
+        density="comfortable"
+        class="mb-3"
+        hint="For Azure OpenAI / Microsoft Foundry"
+        persistent-hint
+        />
+
         <v-alert v-if="errorMessage" type="error" variant="tonal" class="mt-3">
           {{ errorMessage }}
         </v-alert>
@@ -88,6 +100,7 @@ export default {
       keys: {
         openai: '',
         anthropic: '',
+        azure: '',
       },
       errorMessage: '',
     };
@@ -121,6 +134,7 @@ export default {
           const parsed = JSON.parse(stored);
           this.keys.openai = parsed.openai_api_key || '';
           this.keys.anthropic = parsed.anthropic_api_key || '';
+          this.keys.azure = parsed.azure_api_key || '';
         } catch (e) {
           console.error('Failed to parse stored API keys', e);
         }
@@ -135,6 +149,9 @@ export default {
       if (this.keys.anthropic.trim()) {
         apiKeys.anthropic_api_key = this.keys.anthropic.trim();
       }
+      if (this.keys.azure.trim()) {
+      apiKeys.azure_api_key = this.keys.azure.trim();
+      }
       sessionStorage.setItem('bpmn_api_keys', JSON.stringify(apiKeys));
       this.$emit('keys-updated');
       this.$emit('close');
@@ -144,6 +161,7 @@ export default {
       this.keys = {
         openai: '',
         anthropic: '',
+        azure: '',
       };
       this.$emit('keys-updated');
       this.$emit('close');

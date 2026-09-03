@@ -5,7 +5,7 @@ services:
       context: .
       dockerfile: ./src/bpmn_assistant/Dockerfile
     ports:
-        - "8000:8000"
+        - "8002:8000"
     env_file:
       - ./src/bpmn_assistant/.env
     networks:
@@ -24,6 +24,9 @@ services:
     build:
       context: .
       dockerfile: ./src/bpmn_frontend/Dockerfile
+      args: 
+        VITE_API_BASE_URL: "http://10.10.0.122:8002"
+        VITE_LAYOUT_BASE_URL: "http://10.10.0.122:3001"
     ports:
       - "8080:80"
     depends_on:

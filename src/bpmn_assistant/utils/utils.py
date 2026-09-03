@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from bpmn_assistant.core import LLMFacade, MessageItem, MessageImage
 from bpmn_assistant.core.enums import (
     AnthropicModels,
+    AzureModels,
     BPMNElementType,
     EventDefinitionType,
     OpenAIModels,
@@ -36,6 +37,9 @@ def get_llm_facade(model: str, output_mode: OutputMode = OutputMode.JSON, api_ke
     elif is_anthropic_model(model):
         api_key = api_keys.get("anthropic_api_key") or os.getenv("ANTHROPIC_API_KEY")
         provider = Provider.ANTHROPIC
+    elif is_azure_model(model):
+        api_key = api_keys.get("azure_api_key") or os.getenv("AZURE_API_KEY")
+        provider = Provider.AZURE
     else:
         raise Exception("Invalid model")
 
@@ -67,15 +71,18 @@ def get_available_providers(api_keys: dict[str, str] | None = None) -> dict:
         # BYOK mode - only check user-provided keys
         openai_present = bool(api_keys.get("openai_api_key"))
         anthropic_present = bool(api_keys.get("anthropic_api_key"))
+        azure_present = bool(api_keys.get("azure_api_key"))
     else:
         # Local Docker mode - check environment variables
         load_dotenv(override=True)
         openai_present = bool(os.getenv("OPENAI_API_KEY"))
         anthropic_present = bool(os.getenv("ANTHROPIC_API_KEY"))
+        azure_present = bool(os.getenv("AZURE_API_KEY"))
 
     return {
         "openai": openai_present,
         "anthropic": anthropic_present,
+        "azure": azure_present,
     }
 
 
@@ -86,6 +93,8 @@ def is_openai_model(model: str) -> bool:
 def is_anthropic_model(model: str) -> bool:
     return model in [model.value for model in AnthropicModels]
 
+def is_azure_model(model: str) -> bool:
+    return model in [model.value for model in AzureModels]
 
 def message_history_to_string(message_history: list[MessageItem]) -> str:
     """

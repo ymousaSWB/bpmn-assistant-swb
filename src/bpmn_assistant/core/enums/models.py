@@ -9,3 +9,6 @@ class OpenAIModels(Enum):
 class AnthropicModels(Enum):
     OPUS_4_8 = "claude-opus-4-8"
     SONNET_5 = "claude-sonnet-5"
+
+class AzureModels(Enum):
+    GPT_5_4 = "gpt-5.4"

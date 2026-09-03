@@ -1,16 +1,16 @@
-import { isHostedVersion } from "../config";
+import { bpmnAssistantUrl, bpmnLayoutServerUrl } from "../config";
 
 export const REMOTE_SERVICES = [
   {
     id: "assistant",
     label: "BPMN Assistant API",
-    url: "https://bpmn-assistant-api.onrender.com",
+    url: bpmnAssistantUrl,
     path: "/",
   },
   {
     id: "layout",
     label: "BPMN Layout Server",
-    url: "https://bpmn-layout-server.onrender.com",
+    url: bpmnLayoutServerUrl,
     path: "/",
   },
 ];
@@ -115,19 +115,6 @@ const pingService = async (service, deadline, onStatus) => {
 };
 
 export const warmupServices = async ({ timeoutMs = DEFAULT_TIMEOUT_MS, onStatus } = {}) => {
-  if (!isHostedVersion) {
-    const statuses = REMOTE_SERVICES.map((service) => {
-      const status = initialStatus(service);
-      status.hasResponded = true;
-      status.ok = true;
-      status.completed = true;
-      status.statusCode = 200;
-      updateAndNotify(status, onStatus);
-      return status;
-    });
-    return { statuses, timedOut: false };
-  }
-
   const deadline = Date.now() + timeoutMs;
   const statuses = await Promise.all(
     REMOTE_SERVICES.map((service) => pingService(service, deadline, onStatus)),

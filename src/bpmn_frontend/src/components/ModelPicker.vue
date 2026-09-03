@@ -22,6 +22,7 @@ import { getApiKeys } from '../utils/apiKeys';
 const Models = Object.freeze({
   GPT_5_6_SOL: 'gpt-5.6-sol',
   GPT_5_6_LUNA: 'gpt-5.6-luna',
+  AZURE_GPT_5_4: 'gpt-5.4',
   OPUS_4_8: 'claude-opus-4-8',
   SONNET_5: 'claude-sonnet-5',
 });
@@ -29,16 +30,19 @@ const Models = Object.freeze({
 const Providers = Object.freeze({
   OPENAI: 'openai',
   ANTHROPIC: 'anthropic',
+  AZURE: 'azure',
 });
 
 export default {
   name: 'ModelPicker',
+
   props: {
     hasImages: {
       type: Boolean,
       default: false,
     },
   },
+
   data() {
     return {
       selectedModel: '',
@@ -54,6 +58,11 @@ export default {
           provider: Providers.OPENAI,
         },
         {
+          value: Models.AZURE_GPT_5_4,
+          title: 'GPT-5.4 (Azure)',
+          provider: Providers.AZURE,
+        },
+        {
           value: Models.OPUS_4_8,
           title: 'Claude Opus 4.8',
           provider: Providers.ANTHROPIC,
@@ -67,48 +76,60 @@ export default {
       availableProviders: [],
     };
   },
+
   computed: {
     availableModels() {
       let filteredModels = this.models.filter((model) =>
         this.availableProviders.includes(model.provider)
       );
 
-      // If images are uploaded, only show OpenAI models
       if (this.hasImages) {
         filteredModels = filteredModels.filter(
-          (model) => model.provider === Providers.OPENAI
+          (model) =>
+            model.provider === Providers.OPENAI ||
+            model.provider === Providers.AZURE
         );
       }
 
       return filteredModels;
     },
   },
+
   methods: {
     onModelChange(model) {
       this.selectedModel = model;
       this.$emit('select-model', model);
     },
+
     async fetchAvailableProviders() {
       try {
         const apiKeys = getApiKeys();
 
         if (isHostedVersion) {
-          // Production mode: determine providers from user-entered keys only
           this.availableProviders = [];
+
           if (apiKeys.openai_api_key) {
             this.availableProviders.push(Providers.OPENAI);
           }
+
           if (apiKeys.anthropic_api_key) {
             this.availableProviders.push(Providers.ANTHROPIC);
           }
+
+          if (apiKeys.azure_api_key) {
+            this.availableProviders.push(Providers.AZURE);
+          }
         } else {
-          // Local mode: check backend (which uses .env file)
           const response = await fetch(
             `${bpmnAssistantUrl}/available_providers`,
             {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ api_keys: apiKeys }),
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                api_keys: apiKeys,
+              }),
             }
           );
 
@@ -123,12 +144,13 @@ export default {
           );
         }
 
-        // Notify parent if no providers available
         const hasProviders = this.availableProviders.length > 0;
         this.$parent.setHasAvailableProviders(hasProviders);
 
         if (this.availableProviders.includes(Providers.OPENAI)) {
           this.onModelChange(Models.GPT_5_6_SOL);
+        } else if (this.availableProviders.includes(Providers.AZURE)) {
+          this.onModelChange(Models.AZURE_GPT_5_4);
         } else if (this.availableProviders.includes(Providers.ANTHROPIC)) {
           this.onModelChange(Models.OPUS_4_8);
         }
@@ -137,6 +159,7 @@ export default {
       }
     },
   },
+
   mounted() {
     this.fetchAvailableProviders();
   },

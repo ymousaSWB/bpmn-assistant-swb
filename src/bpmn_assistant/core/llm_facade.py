@@ -29,11 +29,12 @@ class LLMFacade:
         supported_providers = {
             Provider.OPENAI,
             Provider.ANTHROPIC,
+            Provider.AZURE,
         }
         if provider not in supported_providers:
             raise ValueError(f"Unsupported LLM provider: {provider}")
 
-        self.provider: LLMProvider = LiteLLMProvider(api_key, output_mode)
+        self.provider: LLMProvider = LiteLLMProvider(api_key, provider, output_mode)
         self.model = model
         self.output_mode = output_mode
 
