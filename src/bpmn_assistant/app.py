@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.middleware.cors import CORSMiddleware
@@ -24,7 +25,7 @@ from bpmn_assistant.utils import (
     get_llm_facade,
 )
 
-ALLOWED_ORIGINS = [
+DEFAULT_ALLOWED_ORIGIN = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:4173",
@@ -35,7 +36,13 @@ ALLOWED_ORIGINS = [
     "http://10.10.0.122:8080",
 ]
 
+env_origins = os.getenv("ALLOWED_ORIGINS", "")
 
+ALLOWED_ORIGINS = (
+    [origin.strip() for origin in env_origins.split(",") if origin.strip()]
+    if env_origins
+    else DEFAULT_ALLOWED_ORIGINS
+)
 app = FastAPI()
 
 app.add_middleware(
