@@ -16,7 +16,7 @@
 </template>
 
 <script>
-import { bpmnAssistantUrl, isHostedVersion } from '../config';
+import { bpmnAssistantUrl } from '../config';
 import { getApiKeys } from '../utils/apiKeys';
 
 const Models = Object.freeze({
@@ -105,46 +105,31 @@ export default {
       try {
         const apiKeys = getApiKeys();
 
-        if (isHostedVersion) {
-          this.availableProviders = [];
-
-          if (apiKeys.openai_api_key) {
-            this.availableProviders.push(Providers.OPENAI);
+        const response = await fetch(
+          `${bpmnAssistantUrl}/available_providers`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              api_keys: apiKeys,
+            }),
           }
+        );
 
-          if (apiKeys.anthropic_api_key) {
-            this.availableProviders.push(Providers.ANTHROPIC);
-          }
-
-          if (apiKeys.azure_api_key) {
-            this.availableProviders.push(Providers.AZURE);
-          }
-        } else {
-          const response = await fetch(
-            `${bpmnAssistantUrl}/available_providers`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                api_keys: apiKeys,
-              }),
-            }
-          );
-
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-
-          const data = await response.json();
-
-          this.availableProviders = Object.keys(data).filter(
-            (provider) => data[provider]
-          );
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
 
+        const data = await response.json();
+
+        this.availableProviders = Object.keys(data).filter(
+          (provider) => data[provider]
+        );
+
         const hasProviders = this.availableProviders.length > 0;
+
         this.$parent.setHasAvailableProviders(hasProviders);
 
         if (this.availableProviders.includes(Providers.OPENAI)) {

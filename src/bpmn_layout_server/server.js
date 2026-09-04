@@ -23,11 +23,22 @@ app.post('/process-bpmn', async (req, res) => {
   const { bpmnXml } = req.body;
 
   try {
-    const layoutedXml = await layoutProcess(bpmnXml);
-    res.json({ layoutedXml });
+    const { xml: layoutedXml, warnings } = await layoutProcess(bpmnXml);
+
+    if (warnings && warnings.length > 0) {
+      console.warn('BPMN layout warnings:', warnings);
+    }
+
+    res.json({
+      layoutedXml,
+      warnings: warnings || []
+    });
   } catch (error) {
     console.error('Error processing BPMN XML:', error);
-    res.status(500).send('Failed to process BPMN XML');
+    res.status(500).json({
+      error: 'Failed to process BPMN XML',
+      details: error.message
+    });
   }
 });
 

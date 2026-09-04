@@ -35,6 +35,8 @@ class BPMNTask(BaseModel):
     type: TaskType
     id: str
     label: str
+    lane: Optional[str] = None
+    next: Optional[str] = None
 
 
 EventType = Literal["startEvent", "endEvent", "intermediateThrowEvent", "intermediateCatchEvent"]
@@ -52,6 +54,8 @@ class BPMNEvent(BaseModel):
     id: str
     label: Optional[str] = None
     eventDefinition: Optional[EventDefinitionType] = None
+    lane: Optional[str] = None
+    next: Optional[str] = None
 
 
 class ExclusiveGatewayBranch(BaseModel):
@@ -65,6 +69,7 @@ class ExclusiveGatewayBranch(BaseModel):
     condition: str
     path: List["BPMNElement"] = []
     next: Optional[str] = None
+    lane: Optional[str] = None
 
 
 class ExclusiveGateway(BaseModel):
@@ -79,6 +84,7 @@ class ExclusiveGateway(BaseModel):
     label: str
     has_join: bool
     branches: List[ExclusiveGatewayBranch]
+    lane: Optional[str] = None
 
 
 class InclusiveGatewayBranch(BaseModel):
@@ -94,6 +100,7 @@ class InclusiveGatewayBranch(BaseModel):
     path: List["BPMNElement"] = []
     next: Optional[str] = None
     is_default: bool = False
+    lane: Optional[str] = None
 
 
 class InclusiveGateway(BaseModel):
@@ -109,17 +116,25 @@ class InclusiveGateway(BaseModel):
     label: str
     has_join: bool
     branches: List[InclusiveGatewayBranch]
+    lane: Optional[str] = None
 
 
 class ParallelGateway(BaseModel):
     """
     Represents a BPMN parallel gateway.
-    - 'branches': an array of arrays, each of which holds a list of BPMN elements
-      to be executed in parallel.
+
+    If has_join is True, all branches are synchronized by an
+    automatically generated parallel join gateway.
+
+    If has_join is False, the first branch is treated as the main
+    continuation of the process. Additional branches may terminate
+    independently without being synchronized.
     """
 
     type: Literal["parallelGateway"]
     id: str
+    lane: Optional[str] = None
+    has_join: bool = True
     branches: List[List["BPMNElement"]]
 
 

@@ -16,6 +16,16 @@ You have made modifications to the BPMN process, and this is the updated BPMN pr
 ```json
 {{ process }}
 ```
+Important:
+The JSON representation does not explicitly contain sequenceFlow objects.
+Sequence flows are automatically derived from the order of elements, gateway branches, and "next" references when BPMN XML is generated.
+
+Therefore:
+- Do NOT claim that sequence flows are missing merely because they are not explicitly present in the JSON.
+- Assume sequentially adjacent elements are connected unless the JSON structure indicates otherwise.
+- Gateway branches and "next" references also represent sequence flow relationships.
+- Only state that a requested connection is missing if the process structure actually does not represent that connection.
+- Do not mention implementation details about the internal JSON representation to the user.
 
 Make a final comment to the user. Base everything you say on the JSON above, do not invent tasks or flows that are not present. Briefly describe what was modified. If any part of the user's request could not be satisfied because of BPMN/validation rules, explicitly mention that and what was done instead.
 

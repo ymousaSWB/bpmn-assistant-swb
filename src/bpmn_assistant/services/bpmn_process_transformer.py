@@ -68,6 +68,7 @@ class BpmnProcessTransformer:
                         "id": join_gateway_id,
                         "type": "exclusiveGateway",
                         "label": None,
+                        "lane": element.get("lane"),
                     }
                 )
 
@@ -124,6 +125,7 @@ class BpmnProcessTransformer:
                         "id": join_gateway_id,
                         "type": "inclusiveGateway",
                         "label": None,
+                        "lane": element.get("lane"),
                     }
                 )
 
@@ -184,36 +186,89 @@ class BpmnProcessTransformer:
 
             return join_gateway_id
 
-        def handle_parallel_gateway(element: dict) -> str:
-            # Create a 'join' parallel gateway element
-            join_gateway_id = f"{element['id']}-join"
-            elements.append(
-                {
-                    "id": join_gateway_id,
-                    "type": "parallelGateway",
-                    "label": None,
-                }
-            )
+        def handle_parallel_gateway(
+            element: dict,
+            next_element_id: Optional[str] = None,
+        ) -> Optional[str]:
+            has_join = element.get("has_join", True)
 
-            for branch in element["branches"]:
-                branch_structure = self.transform(branch, join_gateway_id)
-                if not branch_structure["elements"]:
-                    raise ValueError(
-                        f"Parallel gateway '{element['id']}' cannot have an empty branch. "
-                        "Do not delete the last element in a branch; update or remove the gateway instead."
+            # ---------------------------------------------------------
+            # Classical parallel split + join
+            # ---------------------------------------------------------
+            if has_join:
+                join_gateway_id = f"{element['id']}-join"
+
+                elements.append(
+                    {
+                        "id": join_gateway_id,
+                        "type": "parallelGateway",
+                        "label": None,
+                        "lane": element.get("lane"),
+                    }
+                )
+
+                for branch in element["branches"]:
+                    branch_structure = self.transform(
+                        branch,
+                        join_gateway_id,
                     )
+
+                    if not branch_structure["elements"]:
+                        raise ValueError(
+                            f"Parallel gateway '{element['id']}' "
+                            "cannot have an empty branch."
+                        )
+
+                    elements.extend(branch_structure["elements"])
+                    flows.extend(branch_structure["flows"])
+
+                    first_element = branch_structure["elements"][0]
+
+                    add_flow(
+                        element["id"],
+                        first_element["id"],
+                    )
+
+                return join_gateway_id
+
+            # ---------------------------------------------------------
+            # Parallel split WITHOUT synchronization
+            #
+            # Convention:
+            # - First branch = main process continuation
+            # - Additional branches terminate independently
+            # ---------------------------------------------------------
+
+            for branch_index, branch in enumerate(element["branches"]):
+                if not branch:
+                    raise ValueError(
+                        f"Parallel gateway '{element['id']}' "
+                        "cannot have an empty branch."
+                    )
+
+                if branch_index == 0:
+                    branch_structure = self.transform(
+                        branch,
+                        next_element_id,
+                    )
+                else:
+                    branch_structure = self.transform(
+                        branch,
+                        None,
+                    )
+
                 elements.extend(branch_structure["elements"])
                 flows.extend(branch_structure["flows"])
 
-                # Add the flow from the parallel gateway to the first element in the branch
-                first_element = branch_structure["elements"][0]
-                add_flow(element["id"], first_element["id"])
+                if branch_structure["elements"]:
+                    first_element = branch_structure["elements"][0]
 
-                # Add the flow from the last element in the branch to the join gateway
-                last_element = branch_structure["elements"][-1]
-                add_flow(last_element["id"], join_gateway_id)
+                    add_flow(
+                        element["id"],
+                        first_element["id"],
+                    )
 
-            return join_gateway_id
+            return None
 
         for index, element in enumerate(process):
             next_element_id = (
@@ -226,6 +281,9 @@ class BpmnProcessTransformer:
                 "id": element["id"],
                 "type": element["type"],
                 "label": element.get("label", None),
+                "lane": element.get("lane"),
+                "pool": element.get("pool"),
+                "next": element.get("next"),
             }
 
             # Preserve eventDefinition if present
@@ -235,27 +293,54 @@ class BpmnProcessTransformer:
             elements.append(transformed_element)
 
             if element["type"] == "exclusiveGateway":
-                join_gateway_id = handle_exclusive_gateway(element, next_element_id)
+                join_gateway_id = handle_exclusive_gateway(
+                    element,
+                    next_element_id,
+                )
 
-                # Connect the join gateway to the next element in the process
                 if join_gateway_id and next_element_id:
-                    add_flow(join_gateway_id, next_element_id)
+                    add_flow(
+                        join_gateway_id,
+                        next_element_id,
+                    )
+
             elif element["type"] == "inclusiveGateway":
-                join_gateway_id = handle_inclusive_gateway(element, next_element_id)
+                join_gateway_id = handle_inclusive_gateway(
+                    element,
+                    next_element_id,
+                )
 
-                # Connect the join gateway to the next element in the process
                 if join_gateway_id and next_element_id:
-                    add_flow(join_gateway_id, next_element_id)
+                    add_flow(
+                        join_gateway_id,
+                        next_element_id,
+                    )
+
             elif element["type"] == "parallelGateway":
-                join_gateway_id = handle_parallel_gateway(element)
+                join_gateway_id = handle_parallel_gateway(
+                    element,
+                    next_element_id,
+                )
 
-                # Connect the join gateway to the next element in the process
-                if next_element_id:
-                    add_flow(join_gateway_id, next_element_id)
-            elif next_element_id and element["type"] != "endEvent":
-                # Add the flow between the current element and the next element in the process
-                add_flow(element["id"], next_element_id)
+                if join_gateway_id and next_element_id:
+                    add_flow(
+                        join_gateway_id,
+                        next_element_id,
+                    )
 
+            elif element["type"] != "endEvent":
+                explicit_next = element.get("next")
+
+                if explicit_next:
+                    add_flow(
+                        element["id"],
+                        explicit_next,
+                    )
+                elif next_element_id:
+                    add_flow(
+                        element["id"],
+                        next_element_id,
+                    )
         # Add incoming and outgoing flows to each element
         for element in elements:
             element["incoming"] = [

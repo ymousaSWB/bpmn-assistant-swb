@@ -32,8 +32,53 @@ class BpmnJsonGenerator:
             - Parallel gateways must have a corresponding join gateway
         """
         root = ET.fromstring(bpmn_xml)
+        pool_name = None
+
+        for elem in root:
+            tag = elem.tag.split("}")[-1]
+
+            if tag != "collaboration":
+                continue
+
+            for child in elem:
+                child_tag = child.tag.split("}")[-1]
+
+                if child_tag == "participant":
+                    pool_name = child.get("name")
+                    break
+
+            if pool_name:
+                break
+
         process_element = self._find_process_element(root)
-        self._get_elements_and_flows(process_element)
+
+        lane_mapping = {}
+
+        for elem in process_element:
+            tag = elem.tag.split("}")[-1]
+
+            if tag != "laneSet":
+                continue
+
+            for lane in elem:
+                lane_tag = lane.tag.split("}")[-1]
+
+                if lane_tag != "lane":
+                    continue
+
+                lane_name = lane.get("name") or lane.get("id")
+
+                for child in lane:
+                    child_tag = child.tag.split("}")[-1]
+
+                    if child_tag == "flowNodeRef" and child.text:
+                        lane_mapping[child.text] = lane_name
+
+        self._get_elements_and_flows(
+            process_element,
+            lane_mapping=lane_mapping,
+        )
+
         start_events = [
             elem
             for elem in self.elements.values()
@@ -42,6 +87,8 @@ class BpmnJsonGenerator:
         if len(start_events) != 1:
             raise ValueError("Process must contain exactly one start event")
         self._build_process_structure()
+        if pool_name and self.process:
+            self.process[0]["pool"] = pool_name
         return self.process
 
     def _build_process_structure(self):
@@ -466,7 +513,13 @@ class BpmnJsonGenerator:
         }
         return handlers.get(element_type)
 
-    def _get_elements_and_flows(self, process: ET.Element):
+    def _get_elements_and_flows(
+        self,
+        process: ET.Element,
+        lane_mapping: dict[str, str] | None = None,
+    ):
+        lane_mapping = lane_mapping or {}
+
         labeled_elements = {
             BPMNElementType.TASK.value,
             BPMNElementType.USER_TASK.value,
@@ -485,7 +538,7 @@ class BpmnJsonGenerator:
         }
 
         for elem in process:
-            tag = elem.tag.split("}")[-1]  # Remove namespace
+            tag = elem.tag.split("}")[-1]
             elem_id = elem.get("id")
 
             if tag in [element.value for element in BPMNElementType]:
@@ -493,23 +546,29 @@ class BpmnJsonGenerator:
                     "type": tag,
                     "id": elem_id,
                 }
+
+                if elem_id in lane_mapping:
+                    self.elements[elem_id]["lane"] = lane_mapping[elem_id]
+
                 if tag in labeled_elements:
                     name = elem.get("name")
-                    if name:  # Only add label if name exists and is not empty
+                    if name:
                         self.elements[elem_id]["label"] = name
 
-                # Store default flow for inclusive/exclusive gateways
-                if tag in [BPMNElementType.INCLUSIVE_GATEWAY.value, BPMNElementType.EXCLUSIVE_GATEWAY.value]:
+                if tag in [
+                    BPMNElementType.INCLUSIVE_GATEWAY.value,
+                    BPMNElementType.EXCLUSIVE_GATEWAY.value,
+                ]:
                     default_flow = elem.get("default")
                     if default_flow:
                         self.elements[elem_id]["default_flow"] = default_flow
 
-                # Check for event definitions (timerEventDefinition, messageEventDefinition, etc.)
                 for child in elem:
                     child_tag = child.tag.split("}")[-1]
                     if child_tag.endswith("EventDefinition"):
                         self.elements[elem_id]["eventDefinition"] = child_tag
                         break
+
             elif tag == "sequenceFlow":
                 self.flows[elem_id] = {
                     "id": elem_id,
