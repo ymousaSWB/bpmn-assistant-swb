@@ -6,8 +6,11 @@ services:
       dockerfile: ./src/bpmn_assistant/Dockerfile
     ports:
         - "8002:8000"
-    env_file:
-      - ./src/bpmn_assistant/.env
+    environment:
+        AZURE_API_KEY: ${AZURE_API_KEY}
+        AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT}
+        AZURE_OPENAI_DEPLOYMENT: ${AZURE_OPENAI_DEPLOYMENT}
+        ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
     networks:
       - bpmn-network
 
